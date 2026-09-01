@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#081112">
+  <meta name="description" content="GD PAINEL — gestão de conteúdo para TVs">
+  <title>GD PAINEL — Gestão de conteúdo para TV</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23081112'/%3E%3Ccircle cx='32' cy='32' r='18' fill='none' stroke='%23d7f65b' stroke-width='7'/%3E%3Cpath d='M15 32h34' stroke='%23081112' stroke-width='8'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <section id="loginScreen" class="login-screen">
+    <div class="login-visual" aria-hidden="true">
+      <div class="login-orbit orbit-one"></div>
+      <div class="login-orbit orbit-two"></div>
+      <div class="login-message">
+        <span class="eyebrow"><i class="status-dot"></i> CONTEÚDO SEMPRE NO AR</span>
+        <h1>Suas telas.<br><em>Uma só direção.</em></h1>
+        <p>Organize, programe e transmita imagens e vídeos para qualquer ambiente.</p>
+      </div>
+    </div>
+    <div class="login-panel">
+      <form id="loginForm" class="login-card" novalidate>
+        <a class="brand brand-login" href="#" aria-label="GD Painel"><span class="brand-mark">◒</span><strong>GD PAINEL</strong></a>
+        <div class="login-copy">
+          <span class="eyebrow">ÁREA RESTRITA</span>
+          <h2>Acesse seu painel</h2>
+          <p>Use seu e-mail corporativo para continuar.</p>
+        </div>
+        <label class="field"><span>E-mail</span><input id="loginEmail" type="email" placeholder="nome@empresa.com" autocomplete="email" required></label>
+        <label class="field"><span>Senha</span><div class="password-wrap"><input id="loginPassword" type="password" placeholder="Digite sua senha" autocomplete="current-password" required><button id="togglePassword" class="input-action" type="button" aria-label="Mostrar senha">◉</button></div></label>
+        <p id="loginError" class="form-error" role="alert"></p>
+        <button class="button button-primary button-wide" type="submit">Entrar no painel <span>→</span></button>
+        <p class="login-footnote">Acesso exclusivo para equipe autorizada</p>
+      </form>
+    </div>
+  </section>
+
+  <main id="dashboard" class="dashboard" hidden>
+    <aside class="sidebar">
+      <a class="brand" href="#" data-nav="panel"><span class="brand-mark">◒</span><strong>GD PAINEL</strong></a>
+      <div class="workspace-card"><span class="workspace-icon">GD</span><span><small>ESPAÇO DE TRABALHO</small><strong>Minha operação</strong></span><button aria-label="Opções do espaço">⌄</button></div>
+      <nav class="nav" aria-label="Navegação principal">
+        <button class="nav-item active" data-nav="panel"><span class="nav-icon">▣</span><span>Painel</span></button>
+        <button class="nav-item" data-nav="library"><span class="nav-icon">▧</span><span>Biblioteca</span><b id="libraryBadge">0</b></button>
+        <button class="nav-item" data-nav="playlists"><span class="nav-icon">☷</span><span>Playlists</span><b id="playlistBadge">1</b></button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="screen-status"><i class="status-dot"></i><span><small>STATUS DA TV</small><strong>Pronta para transmitir</strong></span></div>
+        <div class="account-card"><span id="accountAvatar" class="account-avatar">U</span><span class="account-copy"><small>ACESSADO COMO</small><strong id="accountEmail">usuario@empresa.com</strong></span><button id="logoutButton" title="Sair da conta" aria-label="Sair da conta">↪</button></div>
+      </div>
+    </aside>
+
+    <section class="main-content">
+      <header class="topbar">
+        <div><p id="todayLabel" class="eyebrow"></p><h1 id="pageTitle">Visão geral</h1><p id="pageSubtitle" class="page-subtitle">Acompanhe sua programação e mantenha a TV no ar.</p></div>
+        <div class="topbar-actions"><button id="openTvButton" class="button button-secondary">Pré-visualizar TV <span>↗</span></button></div>
+      </header>
+
+      <section id="panelView" class="view active-view">
+        <article class="broadcast-card">
+          <div class="broadcast-copy">
+            <span class="eyebrow"><i class="status-dot"></i> PROGRAMAÇÃO ATIVA</span>
+            <h2 id="heroTitle">Sua playlist está<br><em>pronta para rodar.</em></h2>
+            <p id="heroSummary">Carregando programação...</p>
+            <div id="activeBroadcastStatus" class="active-broadcast-status"><i class="status-dot"></i><span>TV aguardando conexão</span></div>
+            <div class="hero-actions"><button class="button button-primary" data-nav="playlists">Editar playlist <span>→</span></button><button id="copyTvLinkHero" class="button button-ghost">Copiar link da TV</button></div>
+          </div>
+          <div class="screen-preview"><div class="screen-frame"><div id="dashboardPreview" class="screen-art"><video id="dashboardPreviewVideo" muted playsinline></video><span class="screen-play">▶</span></div></div><div class="preview-meta"><span><i class="status-dot"></i> TV PRINCIPAL</span><strong>16:9 · Online</strong></div></div>
+        </article>
+        <div class="stats-grid">
+          <article class="stat-card"><span class="stat-icon">▧</span><div><strong id="statMedia">0</strong><small>itens na biblioteca</small></div></article>
+          <article class="stat-card"><span class="stat-icon">☷</span><div><strong id="statPlaylists">1</strong><small>playlists criadas</small></div></article>
+          <article class="stat-card"><span class="stat-icon">◷</span><div><strong id="statDuration">0 min</strong><small>duração da playlist ativa</small></div></article>
+        </div>
+        <div class="section-heading"><div><span class="eyebrow">COMECE POR AQUI</span><h3>Ações rápidas</h3></div></div>
+        <div class="quick-grid">
+          <button class="quick-card" data-nav="library"><span>＋</span><strong>Adicionar mídia</strong><small>Envie imagens e vídeos</small><i>→</i></button>
+          <button class="quick-card" data-nav="playlists"><span>☷</span><strong>Organizar playlist</strong><small>Defina ordem e duração</small><i>→</i></button>
+          <button id="generateLinkQuick" class="quick-card"><span>↗</span><strong>Compartilhar com a TV</strong><small>Gere o link de reprodução</small><i>→</i></button>
+        </div>
+      </section>
+
+      <section id="libraryView" class="view">
+        <div id="dropZone" class="drop-zone"><div><span class="drop-icon">↑</span><strong>Arraste arquivos para enviar</strong><small>Imagens e vídeos de até 250 MB</small></div><label class="button button-primary">Escolher arquivos<input id="fileInput" type="file" accept="image/*,video/*" multiple hidden></label></div>
+        <div class="content-toolbar"><div id="libraryFilters" class="segmented"><button class="active" data-filter="all">Tudo <b id="countAll">0</b></button><button data-filter="image">Imagens <b id="countImages">0</b></button><button data-filter="video">Vídeos <b id="countVideos">0</b></button></div><label class="search-field"><span>⌕</span><input id="librarySearch" type="search" placeholder="Buscar na biblioteca"></label></div>
+        <div id="libraryGrid" class="media-grid"></div>
+        <div id="libraryEmpty" class="empty-state" hidden><span>▧</span><h3>Nenhuma mídia encontrada</h3><p>Envie um arquivo ou altere os filtros de busca.</p></div>
+      </section>
+
+      <section id="playlistsView" class="view">
+        <div class="playlist-layout">
+          <aside class="playlist-sidebar-panel">
+            <div class="panel-heading"><div><span class="eyebrow">SUAS LISTAS</span><h3>Playlists</h3></div><button id="newPlaylistButton" class="icon-button" title="Nova playlist" aria-label="Nova playlist">＋</button></div>
+            <label class="search-field compact"><span>⌕</span><input id="playlistSearch" type="search" placeholder="Buscar playlist"></label>
+            <div id="playlistCards" class="playlist-cards"></div>
+          </aside>
+          <section class="playlist-editor">
+            <div class="editor-header"><div><span class="eyebrow">EDITANDO AGORA</span><div class="title-row"><h2 id="activePlaylistName">Playlist principal</h2><button id="renamePlaylistButton" class="icon-button subtle" title="Renomear playlist" aria-label="Renomear playlist">✎</button></div><p id="activePlaylistMeta">0 itens · 0 minutos</p></div><div class="editor-actions"><button id="deletePlaylistButton" class="button button-danger">Excluir</button><button id="generateLinkButton" class="button button-primary">Gerar link da TV <span>↗</span></button></div></div>
+            <div class="playlist-options"><label class="switch-label"><input id="repeatToggle" type="checkbox" checked><span class="switch"></span>Repetir continuamente</label><button class="button button-secondary" data-nav="library">＋ Adicionar da biblioteca</button></div>
+            <div id="playlistItems" class="playlist-items"></div>
+            <div id="playlistEmpty" class="empty-state compact-empty"><span>☷</span><h3>Esta playlist está vazia</h3><p>Adicione conteúdos da Biblioteca para começar.</p><button class="button button-primary" data-nav="library">Abrir biblioteca</button></div>
+          </section>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <section id="tvPlayer" class="tv-player" hidden>
+    <div id="tvImage" class="tv-media"></div><video id="tvVideo" class="tv-media" playsinline></video><div class="tv-overlay"></div>
+    <div id="tvEmpty" class="tv-empty" hidden><span>◒</span><h1>GD PAINEL</h1><p>Esta playlist ainda não possui conteúdo.</p></div>
+    <div class="tv-brand"><i class="status-dot"></i><span>GD PAINEL TV</span></div>
+    <div class="tv-progress"><div id="tvProgress"></div></div>
+    <div class="tv-controls"><span id="tvCounter"></span><span id="tvMediaName"></span><button id="exitTvButton">× Sair</button></div>
+  </section>
+
+  <div id="modalBackdrop" class="modal-backdrop" hidden>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button id="modalClose" class="modal-close" aria-label="Fechar">×</button><span id="modalEyebrow" class="eyebrow">PLAYLIST</span><h2 id="modalTitle">Nova playlist</h2><p id="modalDescription">Dê um nome claro para encontrar essa programação depois.</p>
+      <label id="modalField" class="field"><span>Nome da playlist</span><input id="modalInput" maxlength="60" placeholder="Ex.: Recepção principal"></label>
+      <div class="modal-actions"><button id="modalCancel" class="button button-secondary">Cancelar</button><button id="modalConfirm" class="button button-primary">Salvar</button></div>
+    </section>
+  </div>
+  <div id="toast" class="toast" role="status"></div>
+  <script src="js/app.js"></script>
+</body>
+</html>
+
