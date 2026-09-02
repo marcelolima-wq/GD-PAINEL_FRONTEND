@@ -181,7 +181,7 @@ async function addFiles(files){
   const accepted=[...files].filter(file=>(file.type.startsWith('image/')||file.type.startsWith('video/'))&&file.size<=250*1024*1024);
   if(!accepted.length){showToast('Selecione imagens ou vídeos de até 250 MB.');return}
   showToast(`Enviando ${accepted.length} ${accepted.length===1?'arquivo':'arquivos'}...`);
-  try{const{upload}=await import('https://esm.sh/@vercel/blob@2.8.0/client?bundle');for(const file of accepted){const blob=await upload(`gd-painel/${Date.now()}-${file.name}`,file,{access:'public',handleUploadUrl:'/api/media/upload'});state.library.unshift({id:uid(),name:file.name,type:file.type.startsWith('video/')?'video':'image',size:file.size,source:'blob',src:blob.url})}saveState();renderAll();showToast(`${accepted.length} ${accepted.length===1?'arquivo enviado':'arquivos enviados'} e sincronizado.`)}
+  try{const upload=window.VercelBlobClient?.upload;if(typeof upload!=='function')throw new Error('Cliente de upload indisponível.');for(const file of accepted){const blob=await upload(`gd-painel/${Date.now()}-${file.name}`,file,{access:'public',handleUploadUrl:'/api/media/upload'});state.library.unshift({id:uid(),name:file.name,type:file.type.startsWith('video/')?'video':'image',size:file.size,source:'blob',src:blob.url})}saveState();renderAll();showToast(`${accepted.length} ${accepted.length===1?'arquivo enviado':'arquivos enviados'} e sincronizado.`)}
   catch(error){console.error(error);showToast('Falha no envio. Tente novamente.')}
 }
 $('fileInput').addEventListener('change',event=>addFiles(event.target.files));
