@@ -69,7 +69,7 @@ async function pullState(){
 async function refreshServerPlayback(){
   if(!panelAuthenticated)return;
   try{const response=await fetch('/api/playback',{credentials:'same-origin',headers:{Accept:'application/json'},cache:'no-store'});const data=await response.json();serverPlayback=response.ok&&data.active?data.playback:null;if(!$('dashboard').hidden)renderDashboard()}
-  catch{serverPlayback=null}
+  catch{serverPlayback=null;if(!$('dashboard').hidden)renderDashboard()}
 }
 function formatElapsed(startedAt){
   const seconds=Math.max(0,Math.floor((Date.now()-startedAt)/1000));
@@ -157,10 +157,9 @@ function renderMiniTv(){
   const item=playlist.items[playback.currentIndex];const media=item&&mediaById(item.mediaId);if(!media){return}
   if(media.type==='video'){
     preview.style.backgroundImage='';preview.classList.add('is-video');video.hidden=false;
-    if(video.src!==media.src){video.src=media.src;video.load()}
-    const offset=Math.max(0,(Date.now()-(playback.itemStartedAt||Date.now()))/1000);
-    if(Number.isFinite(video.duration)&&video.duration>0&&Math.abs(video.currentTime-offset)>2)video.currentTime=Math.min(offset,Math.max(0,video.duration-.1));
-    video.play().catch(()=>{});
+    const syncVideo=()=>{const offset=Math.max(0,(Date.now()-(playback.itemStartedAt||Date.now()))/1000);if(Number.isFinite(video.duration)&&video.duration>0&&Math.abs(video.currentTime-offset)>.75)video.currentTime=Math.min(offset,Math.max(0,video.duration-.1));video.play().catch(()=>{})};
+    if(video.src!==media.src){video.src=media.src;video.load();video.onloadedmetadata=syncVideo}
+    syncVideo();
   }else{
     video.hidden=true;video.pause();preview.classList.remove('is-video');preview.style.backgroundImage=media.src?`url("${media.src}")`:'';
   }
@@ -274,7 +273,7 @@ $('fullscreenTvButton').addEventListener('click',toggleTvFullscreen);
 document.addEventListener('fullscreenchange',updateFullscreenButton);document.addEventListener('webkitfullscreenchange',updateFullscreenButton);
 $('exitTvButton').addEventListener('click',async()=>{clearTimeout(tvTimer);clearTimeout(tvSyncTimer);clearTimeout(tvHeartbeatTimer);cancelAnimationFrame(tvFrame);tvReference=null;$('tvVideo').pause();$('tvPlayer').hidden=true;if(fullscreenElement()){const exit=document.exitFullscreen||document.webkitExitFullscreen;if(exit)await exit.call(document)}const direct=new URLSearchParams(location.search).has('tv');if(direct){const url=new URL(location.href);url.search='';history.replaceState({},'',url);setAuthenticatedView()}else{$('dashboard').hidden=false;renderAll()}});
 window.addEventListener('storage',event=>{if(event.key===APP_KEY){const next=loadState();if(next){state=next;renderAll()}}if(event.key===PLAYBACK_KEY&&!$('dashboard').hidden)renderDashboard()});
-function refreshPlaybackStatus(){if(!$('dashboard').hidden){renderDashboard();refreshServerPlayback()}playbackTimer=setTimeout(refreshPlaybackStatus,10000)}
+async function refreshPlaybackStatus(){if(!$('dashboard').hidden)await refreshServerPlayback();playbackTimer=setTimeout(refreshPlaybackStatus,2000)}
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('modalBackdrop').hidden)closeModal();if(event.key==='ArrowRight'&&!$('tvPlayer').hidden)advanceTv()});
 
 (async function init(){await hydrateLibrary();await setAuthenticatedView();refreshPlaybackStatus()})();
