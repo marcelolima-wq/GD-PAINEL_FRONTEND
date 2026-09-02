@@ -27,4 +27,3 @@ O arquivo `vercel.json` encaminha `/api/*` para `https://gd-painel-backend.verce
 ## Persistência atual
 
 Playlists e mídias ainda usam `localStorage` e `IndexedDB`. Para sincronizar aparelhos diferentes, será necessário migrar esses dados para banco e armazenamento compartilhados.
-
