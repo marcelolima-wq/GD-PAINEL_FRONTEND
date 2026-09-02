@@ -37,6 +37,7 @@ let stateSaveTimer=null;
 let tvSyncTimer=null;
 let tvHeartbeatTimer=null;
 let tvReference=null;
+let uploadInProgress=false;
 
 function loadState(){
   try{
@@ -57,8 +58,8 @@ function loadPlayback(){
 function savePlayback(playback){localStorage.setItem(PLAYBACK_KEY,JSON.stringify(playback))}
 function sharedState(){return{...state,library:state.library.filter(media=>media.src&&!media.src.startsWith('blob:')).map(media=>({...media,source:media.source==='idb'?'legacy':media.source}))}}
 async function pushState(){
-  try{const response=await fetch('/api/state',{method:'PUT',credentials:'same-origin',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({state:sharedState()})});const data=await response.json();if(!response.ok)throw new Error(data.error||'Falha ao sincronizar.');remoteVersion=data.document?.version||remoteVersion}
-  catch(error){console.error('Sincronização falhou.',error);showToast('Não foi possível sincronizar com a TV.')}
+  try{const response=await fetch('/api/state',{method:'PUT',credentials:'same-origin',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({state:sharedState()})});const data=await response.json();if(!response.ok)throw new Error(data.error||'Falha ao sincronizar.');remoteVersion=data.document?.version||remoteVersion;return true}
+  catch(error){console.error('Sincronização falhou.',error);showToast('Não foi possível sincronizar com a TV.');return false}
 }
 async function pullState(){
   const response=await fetch('/api/state',{credentials:'same-origin',headers:{Accept:'application/json'},cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.error||'Falha ao carregar dados.');
@@ -180,11 +181,13 @@ $('librarySearch').addEventListener('input',event=>{libraryQuery=event.target.va
 async function addFiles(files){
   const accepted=[...files].filter(file=>(file.type.startsWith('image/')||file.type.startsWith('video/'))&&file.size<=250*1024*1024);
   if(!accepted.length){showToast('Selecione imagens ou vídeos de até 250 MB.');return}
-  showToast(`Enviando ${accepted.length} ${accepted.length===1?'arquivo':'arquivos'}...`);
-  try{const upload=window.VercelBlobClient?.upload;if(typeof upload!=='function')throw new Error('Cliente de upload indisponível.');for(const file of accepted){const blob=await upload(`gd-painel/${Date.now()}-${file.name}`,file,{access:'public',handleUploadUrl:'/api/media/upload'});state.library.unshift({id:uid(),name:file.name,type:file.type.startsWith('video/')?'video':'image',size:file.size,source:'blob',src:blob.url})}saveState();renderAll();showToast(`${accepted.length} ${accepted.length===1?'arquivo enviado':'arquivos enviados'} e sincronizado.`)}
-  catch(error){console.error(error);showToast('Falha no envio. Tente novamente.')}
+  if(uploadInProgress){showToast('Aguarde o envio atual terminar.');return}
+  uploadInProgress=true;let uploaded=0;
+  try{const upload=window.VercelBlobClient?.upload;if(typeof upload!=='function')throw new Error('Cliente de upload indisponível.');for(const file of accepted){const position=uploaded+1;const blob=await upload(`gd-painel/${Date.now()}-${file.name}`,file,{access:'public',handleUploadUrl:'/api/media/upload',onUploadProgress:progress=>showToast(`Enviando ${position}/${accepted.length} · ${Math.round(progress.percentage||0)}%`)});state.library.unshift({id:uid(),name:file.name,type:file.type.startsWith('video/')?'video':'image',size:file.size,source:'blob',src:blob.url});uploaded++}saveState();clearTimeout(stateSaveTimer);renderAll();const synchronized=await pushState();if(synchronized)showToast(`${uploaded} ${uploaded===1?'arquivo enviado e sincronizado.':'arquivos enviados e sincronizados.'}`)}
+  catch(error){console.error(error);if(uploaded){saveState();clearTimeout(stateSaveTimer);renderAll();await pushState()}showToast(uploaded?'Envio parcial salvo. Tente novamente.':'Falha no envio. Tente novamente.')}
+  finally{uploadInProgress=false}
 }
-$('fileInput').addEventListener('change',event=>addFiles(event.target.files));
+$('fileInput').addEventListener('change',event=>{const files=[...event.target.files];event.target.value='';addFiles(files)});
 ['dragenter','dragover'].forEach(type=>$('dropZone').addEventListener(type,event=>{event.preventDefault();$('dropZone').classList.add('dragover')}));
 ['dragleave','drop'].forEach(type=>$('dropZone').addEventListener(type,event=>{event.preventDefault();$('dropZone').classList.remove('dragover')}));
 $('dropZone').addEventListener('drop',event=>addFiles(event.dataTransfer.files));
@@ -264,3 +267,4 @@ function refreshPlaybackStatus(){if(!$('dashboard').hidden){renderDashboard();re
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('modalBackdrop').hidden)closeModal();if(event.key==='ArrowRight'&&!$('tvPlayer').hidden)advanceTv()});
 
 (async function init(){await hydrateLibrary();await setAuthenticatedView();refreshPlaybackStatus()})();
+
