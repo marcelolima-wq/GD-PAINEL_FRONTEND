@@ -239,7 +239,7 @@ function showInvalidTv(message){
 }
 async function openTv(playlistReference){
   tvReference=playlistReference;clearTimeout(tvSyncTimer);clearTimeout(tvHeartbeatTimer);$('loginScreen').hidden=true;$('dashboard').hidden=true;$('tvPlayer').hidden=false;
-  try{const data=await fetchTvState(playlistReference);state=data.state;remoteVersion=data.version;tvReference=state.playlists[0].code;tvIndex=0;playTv();scheduleTvSync();document.documentElement.requestFullscreen?.().catch(()=>{})}
+  try{const data=await fetchTvState(playlistReference);state=data.state;remoteVersion=data.version;tvReference=state.playlists[0].code;tvIndex=0;playTv();scheduleTvSync()}
   catch(error){showInvalidTv(error.message);scheduleTvSync()}
 }
 async function reportPlayback(){
@@ -261,7 +261,18 @@ function playTv(){
   else{video.hidden=true;image.hidden=false;image.style.backgroundImage=`url("${media.src}")`;const duration=Math.max(1,Number(item.duration)||8)*1000,start=performance.now();const tick=now=>{const progress=Math.min(1,(now-start)/duration);$('tvProgress').style.width=`${progress*100}%`;if(progress<1)tvFrame=requestAnimationFrame(tick);else advanceTv()};tvFrame=requestAnimationFrame(tick)}
 }
 function advanceTv(){const playlist=activePlaylist();if(!playlist.items.length)return;if(tvIndex>=playlist.items.length-1&&!playlist.repeat)return;tvIndex=(tvIndex+1)%playlist.items.length;playTv()}
-$('exitTvButton').addEventListener('click',()=>{clearTimeout(tvTimer);clearTimeout(tvSyncTimer);clearTimeout(tvHeartbeatTimer);cancelAnimationFrame(tvFrame);tvReference=null;$('tvVideo').pause();$('tvPlayer').hidden=true;if(document.fullscreenElement)document.exitFullscreen();const direct=new URLSearchParams(location.search).has('tv');if(direct){const url=new URL(location.href);url.search='';history.replaceState({},'',url);setAuthenticatedView()}else{$('dashboard').hidden=false;renderAll()}});
+function fullscreenElement(){return document.fullscreenElement||document.webkitFullscreenElement||null}
+function updateFullscreenButton(){const active=Boolean(fullscreenElement());const button=$('fullscreenTvButton');button.textContent=active?'⤢ Sair da tela cheia':'⛶ Tela cheia';button.setAttribute('aria-label',active?'Sair da tela cheia':'Ativar tela cheia')}
+async function toggleTvFullscreen(){
+  try{
+    if(fullscreenElement()){const exit=document.exitFullscreen||document.webkitExitFullscreen;if(exit)await exit.call(document)}
+    else{const player=$('tvPlayer');const request=player.requestFullscreen||player.webkitRequestFullscreen;if(!request)throw new Error('Tela cheia não suportada neste navegador.');await request.call(player)}
+  }catch(error){console.warn('Não foi possível alterar a tela cheia.',error);showToast(error.message||'Não foi possível ativar a tela cheia.')}
+  updateFullscreenButton()
+}
+$('fullscreenTvButton').addEventListener('click',toggleTvFullscreen);
+document.addEventListener('fullscreenchange',updateFullscreenButton);document.addEventListener('webkitfullscreenchange',updateFullscreenButton);
+$('exitTvButton').addEventListener('click',async()=>{clearTimeout(tvTimer);clearTimeout(tvSyncTimer);clearTimeout(tvHeartbeatTimer);cancelAnimationFrame(tvFrame);tvReference=null;$('tvVideo').pause();$('tvPlayer').hidden=true;if(fullscreenElement()){const exit=document.exitFullscreen||document.webkitExitFullscreen;if(exit)await exit.call(document)}const direct=new URLSearchParams(location.search).has('tv');if(direct){const url=new URL(location.href);url.search='';history.replaceState({},'',url);setAuthenticatedView()}else{$('dashboard').hidden=false;renderAll()}});
 window.addEventListener('storage',event=>{if(event.key===APP_KEY){const next=loadState();if(next){state=next;renderAll()}}if(event.key===PLAYBACK_KEY&&!$('dashboard').hidden)renderDashboard()});
 function refreshPlaybackStatus(){if(!$('dashboard').hidden){renderDashboard();refreshServerPlayback()}playbackTimer=setTimeout(refreshPlaybackStatus,10000)}
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('modalBackdrop').hidden)closeModal();if(event.key==='ArrowRight'&&!$('tvPlayer').hidden)advanceTv()});
