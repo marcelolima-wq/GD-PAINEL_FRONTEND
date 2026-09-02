@@ -204,7 +204,11 @@ $('copyTvLinkHero').addEventListener('click',copyCurrentTvLink);$('generateLinkQ
 $('openTvButton').addEventListener('click',()=>openTv(activePlaylist().id));
 
 function openTv(playlistReference){
-  const selected=state.playlists.find(item=>item.code===playlistReference||item.id===playlistReference)||activePlaylist();state.activePlaylistId=selected.id;saveState();savePlayback({playlistId:selected.id,startedAt:Date.now(),currentIndex:0,itemStartedAt:Date.now()});tvIndex=0;$('loginScreen').hidden=true;$('dashboard').hidden=true;$('tvPlayer').hidden=false;playTv();document.documentElement.requestFullscreen?.().catch(()=>{});
+  const selected=state.playlists.find(item=>item.code===playlistReference||item.id===playlistReference);
+  if(!selected){
+    savePlayback(null);$('loginScreen').hidden=true;$('dashboard').hidden=true;$('tvPlayer').hidden=false;$('tvEmpty').hidden=false;$('tvImage').hidden=true;$('tvVideo').hidden=true;$('tvVideo').pause();$('tvCounter').textContent='';$('tvMediaName').textContent='Link removido';$('tvEmpty').querySelector('p').textContent='Este link de playlist não é mais válido. Gere um novo link no painel.';document.documentElement.requestFullscreen?.().catch(()=>{});return
+  }
+  state.activePlaylistId=selected.id;saveState();savePlayback({playlistId:selected.id,startedAt:Date.now(),currentIndex:0,itemStartedAt:Date.now()});tvIndex=0;$('loginScreen').hidden=true;$('dashboard').hidden=true;$('tvPlayer').hidden=false;playTv();document.documentElement.requestFullscreen?.().catch(()=>{});
 }
 function playTv(){
   clearTimeout(tvTimer);cancelAnimationFrame(tvFrame);const playlist=activePlaylist();const item=playlist.items[tvIndex];const image=$('tvImage'),video=$('tvVideo');video.pause();video.removeAttribute('src');video.load();$('tvProgress').style.width='0%';
