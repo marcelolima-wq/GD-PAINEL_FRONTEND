@@ -267,4 +267,3 @@ function refreshPlaybackStatus(){if(!$('dashboard').hidden){renderDashboard();re
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('modalBackdrop').hidden)closeModal();if(event.key==='ArrowRight'&&!$('tvPlayer').hidden)advanceTv()});
 
 (async function init(){await hydrateLibrary();await setAuthenticatedView();refreshPlaybackStatus()})();
-
