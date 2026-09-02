@@ -1,9 +1,11 @@
 const APP_KEY='gd-painel-state-v2';
 const PLAYBACK_KEY='gd-painel-playback-v1';
+const TV_DEVICE_KEY='gd-painel-tv-device-v1';
 const DB_NAME='gd-painel-media';
 const DB_STORE='files';
 const $=id=>document.getElementById(id);
 const uid=()=>crypto.randomUUID?.()||`${Date.now()}-${Math.random().toString(16).slice(2)}`;
+const tvDeviceId=(()=>{let id=localStorage.getItem(TV_DEVICE_KEY);if(!id){id=uid();localStorage.setItem(TV_DEVICE_KEY,id)}return id})();
 const shortCode=()=>Array.from({length:6},()=>"ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random()*32)]).join('');
 const escapeHtml=value=>String(value).replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
 const svgData=(bg,accent,path,label)=>`data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000"><rect width="1600" height="1000" fill="${bg}"/><circle cx="1320" cy="190" r="340" fill="${accent}" opacity=".16"/><path d="${path}" fill="${accent}"/><text x="110" y="790" fill="#f4f6ed" font-family="Arial" font-size="42" letter-spacing="8">${label}</text><text x="110" y="840" fill="${accent}" font-family="Arial" font-size="16" letter-spacing="5">GD PAINEL / CONTEÚDO DIGITAL</text></svg>`)}`;
@@ -243,7 +245,7 @@ async function openTv(playlistReference){
 }
 async function reportPlayback(){
   clearTimeout(tvHeartbeatTimer);if(!tvReference||$('tvPlayer').hidden)return;
-  try{const local=loadPlayback();await fetch('/api/playback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:tvReference,currentIndex:tvIndex,startedAt:Number(local?.startedAt)||Date.now(),itemStartedAt:Number(local?.itemStartedAt)||Date.now()})})}catch(error){console.warn('Status da TV não atualizado.',error)}
+  try{const local=loadPlayback();await fetch('/api/playback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:tvReference,deviceId:tvDeviceId,fullscreen:Boolean(fullscreenElement()),currentIndex:tvIndex,startedAt:Number(local?.startedAt)||Date.now(),itemStartedAt:Number(local?.itemStartedAt)||Date.now()})})}catch(error){console.warn('Status da TV não atualizado.',error)}
   tvHeartbeatTimer=setTimeout(reportPlayback,30000)
 }
 function scheduleTvSync(){clearTimeout(tvSyncTimer);tvSyncTimer=setTimeout(syncTvState,10000)}
@@ -270,7 +272,8 @@ async function toggleTvFullscreen(){
   updateFullscreenButton()
 }
 $('fullscreenTvButton').addEventListener('click',toggleTvFullscreen);
-document.addEventListener('fullscreenchange',updateFullscreenButton);document.addEventListener('webkitfullscreenchange',updateFullscreenButton);
+function handleFullscreenChange(){updateFullscreenButton();if(tvReference&&!$('tvPlayer').hidden)reportPlayback()}
+document.addEventListener('fullscreenchange',handleFullscreenChange);document.addEventListener('webkitfullscreenchange',handleFullscreenChange);
 $('exitTvButton').addEventListener('click',async()=>{clearTimeout(tvTimer);clearTimeout(tvSyncTimer);clearTimeout(tvHeartbeatTimer);cancelAnimationFrame(tvFrame);tvReference=null;$('tvVideo').pause();$('tvPlayer').hidden=true;if(fullscreenElement()){const exit=document.exitFullscreen||document.webkitExitFullscreen;if(exit)await exit.call(document)}const direct=new URLSearchParams(location.search).has('tv');if(direct){const url=new URL(location.href);url.search='';history.replaceState({},'',url);setAuthenticatedView()}else{$('dashboard').hidden=false;renderAll()}});
 window.addEventListener('storage',event=>{if(event.key===APP_KEY){const next=loadState();if(next){state=next;renderAll()}}if(event.key===PLAYBACK_KEY&&!$('dashboard').hidden)renderDashboard()});
 async function refreshPlaybackStatus(){if(!$('dashboard').hidden)await refreshServerPlayback();playbackTimer=setTimeout(refreshPlaybackStatus,2000)}
