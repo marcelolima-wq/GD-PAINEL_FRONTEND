@@ -1,6 +1,7 @@
 const APP_KEY='gd-painel-state-v2';
 const PLAYBACK_KEY='gd-painel-playback-v1';
 const TV_DEVICE_KEY='gd-painel-tv-device-v1';
+const TV_CACHE_KEY='gd-painel-tv-cache-v1';
 const DB_NAME='gd-painel-media';
 const DB_STORE='files';
 const $=id=>document.getElementById(id);
@@ -233,15 +234,17 @@ $('copyTvLinkHero').addEventListener('click',copyCurrentTvLink);$('generateLinkQ
 $('openTvButton').addEventListener('click',()=>openTv(activePlaylist().code));
 
 async function fetchTvState(reference){
-  const response=await fetch(`/api/tv?code=${encodeURIComponent(reference)}`,{headers:{Accept:'application/json'},cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.error||'Programação indisponível.');return data
+  const response=await fetch(`/api/tv?code=${encodeURIComponent(reference)}`,{headers:{Accept:'application/json'},cache:'no-store'});const data=await response.json();if(!response.ok){const error=new Error(data.error||'Programação indisponível.');error.status=response.status;throw error}return data
 }
+function saveTvCache(reference,data){localStorage.setItem(TV_CACHE_KEY,JSON.stringify({code:reference,state:data.state,version:data.version}))}
+function loadTvCache(reference){try{const cache=JSON.parse(localStorage.getItem(TV_CACHE_KEY));return cache?.code?.toUpperCase()===String(reference).toUpperCase()?cache:null}catch{return null}}
 function showInvalidTv(message){
   clearTimeout(tvTimer);cancelAnimationFrame(tvFrame);$('tvImage').hidden=true;$('tvVideo').hidden=true;$('tvVideo').pause();$('tvEmpty').hidden=false;$('tvCounter').textContent='';$('tvMediaName').textContent=message||'Este link de TV não é mais válido.';$('tvProgress').style.width='0%'
 }
 async function openTv(playlistReference){
   tvReference=playlistReference;clearTimeout(tvSyncTimer);clearTimeout(tvHeartbeatTimer);$('loginScreen').hidden=true;$('dashboard').hidden=true;$('tvPlayer').hidden=false;
-  try{const data=await fetchTvState(playlistReference);state=data.state;remoteVersion=data.version;tvReference=state.playlists[0].code;tvIndex=0;playTv();scheduleTvSync()}
-  catch(error){showInvalidTv(error.message);scheduleTvSync()}
+  try{const data=await fetchTvState(playlistReference);state=data.state;remoteVersion=data.version;tvReference=state.playlists[0].code;saveTvCache(tvReference,data);tvIndex=0;playTv();scheduleTvSync()}
+  catch(error){if(error.status===404)showInvalidTv(error.message);else{const cache=loadTvCache(playlistReference);if(cache){state=cache.state;remoteVersion=cache.version;tvReference=cache.code;tvIndex=0;playTv()}else showInvalidTv('Não foi possível conectar à programação.')}scheduleTvSync()}
 }
 async function reportPlayback(){
   clearTimeout(tvHeartbeatTimer);if(!tvReference||$('tvPlayer').hidden)return;
@@ -252,7 +255,7 @@ function scheduleTvSync(){clearTimeout(tvSyncTimer);tvSyncTimer=setTimeout(syncT
 async function syncTvState(){
   if(!tvReference||$('tvPlayer').hidden)return;
   try{const currentMedia=activePlaylist()?.items?.[tvIndex]?.mediaId;const data=await fetchTvState(tvReference);if(data.version!==remoteVersion){state=data.state;remoteVersion=data.version;const nextIndex=state.playlists[0].items.findIndex(item=>item.mediaId===currentMedia);tvIndex=nextIndex>=0?nextIndex:0;playTv()}}
-  catch(error){showInvalidTv(error.message)}finally{scheduleTvSync()}
+  catch(error){if(error.status===404)showInvalidTv(error.message)}finally{scheduleTvSync()}
 }
 function playTv(){
   clearTimeout(tvTimer);cancelAnimationFrame(tvFrame);const playlist=activePlaylist();const item=playlist.items[tvIndex];const image=$('tvImage'),video=$('tvVideo');video.pause();video.removeAttribute('src');video.load();$('tvProgress').style.width='0%';
