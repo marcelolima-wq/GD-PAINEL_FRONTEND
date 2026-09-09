@@ -43,6 +43,9 @@ let tvReference=null;
 let tvVideoRetryTimer=null;
 let tvVideoRetryCount=0;
 let tvWakeLock=null;
+let tvWakeLockPending=false;
+let tvLastVideoTime=0;
+let tvLastVideoProgress=0;
 let uploadInProgress=false;
 
 function loadState(){
@@ -239,7 +242,7 @@ $('openTvButton').addEventListener('click',()=>openTv(activePlaylist().code));
 async function fetchTvState(reference){
   const response=await fetch(`/api/tv?code=${encodeURIComponent(reference)}`,{headers:{Accept:'application/json'},cache:'no-store'});const data=await response.json();if(!response.ok){const error=new Error(data.error||'Programação indisponível.');error.status=response.status;throw error}return data
 }
-function saveTvCache(reference,data){localStorage.setItem(TV_CACHE_KEY,JSON.stringify({code:reference,state:data.state,version:data.version}))}
+function saveTvCache(reference,data){try{localStorage.setItem(TV_CACHE_KEY,JSON.stringify({code:reference,state:data.state,version:data.version}))}catch(error){console.warn('Cache da TV indisponível.',error)}}
 function loadTvCache(reference){try{const cache=JSON.parse(localStorage.getItem(TV_CACHE_KEY));return cache?.code?.toUpperCase()===String(reference).toUpperCase()?cache:null}catch{return null}}
 function showInvalidTv(message){
   clearTimeout(tvTimer);clearTimeout(tvVideoRetryTimer);cancelAnimationFrame(tvFrame);remoteVersion=null;$('tvImage').hidden=true;$('tvVideo').hidden=true;$('tvVideo').onerror=null;$('tvVideo').pause();$('tvEmpty').hidden=false;$('tvCounter').textContent='';$('tvMediaName').textContent=message||'Este link de TV não é mais válido.';$('tvProgress').style.width='0%'
@@ -261,18 +264,30 @@ async function syncTvState(){
   catch(error){if(error.status===404)showInvalidTv(error.message)}finally{scheduleTvSync()}
 }
 function playTv(isRetry=false){
+  tvLastVideoTime=0;tvLastVideoProgress=Date.now();
   clearTimeout(tvTimer);clearTimeout(tvVideoRetryTimer);cancelAnimationFrame(tvFrame);if(!isRetry)tvVideoRetryCount=0;const playlist=activePlaylist();const item=playlist.items[tvIndex];const image=$('tvImage'),video=$('tvVideo');video.onerror=null;video.onended=null;video.ontimeupdate=null;video.pause();video.removeAttribute('src');video.load();$('tvProgress').style.width='0%';
   if(!item){image.hidden=true;video.hidden=true;$('tvEmpty').hidden=false;$('tvCounter').textContent='';$('tvMediaName').textContent=playlist.name;return}
-  const media=mediaById(item.mediaId);if(!media){advanceTv();return}const playback=loadPlayback();savePlayback({playlistId:playlist.id,startedAt:playback?.playlistId===playlist.id&&playback.startedAt?playback.startedAt:Date.now(),currentIndex:tvIndex,itemStartedAt:Date.now()});reportPlayback();$('tvEmpty').hidden=true;$('tvCounter').textContent=`${String(tvIndex+1).padStart(2,'0')} / ${String(playlist.items.length).padStart(2,'0')}`;$('tvMediaName').textContent=media.name;
+  const media=mediaById(item.mediaId);if(!media){tvTimer=setTimeout(advanceTv,1000);return}const playback=loadPlayback();savePlayback({playlistId:playlist.id,startedAt:playback?.playlistId===playlist.id&&playback.startedAt?playback.startedAt:Date.now(),currentIndex:tvIndex,itemStartedAt:Date.now()});reportPlayback();$('tvEmpty').hidden=true;$('tvCounter').textContent=`${String(tvIndex+1).padStart(2,'0')} / ${String(playlist.items.length).padStart(2,'0')}`;$('tvMediaName').textContent=media.name;
   if(media.type==='video'){image.hidden=true;video.hidden=false;video.src=media.src;video.muted=true;video.currentTime=0;video.onerror=()=>{video.onerror=null;if(tvVideoRetryCount<2){tvVideoRetryCount++;tvVideoRetryTimer=setTimeout(()=>playTv(true),3000)}else{tvVideoRetryCount=0;advanceTv()}};video.play().catch(()=>{});video.onended=advanceTv;video.ontimeupdate=()=>{if(video.duration)$('tvProgress').style.width=`${video.currentTime/video.duration*100}%`}}
   else{video.hidden=true;image.hidden=false;image.style.backgroundImage=`url("${media.src}")`;const duration=Math.max(1,Number(item.duration)||8)*1000,start=performance.now();const tick=now=>{const progress=Math.min(1,(now-start)/duration);$('tvProgress').style.width=`${progress*100}%`;if(progress<1)tvFrame=requestAnimationFrame(tick);else advanceTv()};tvFrame=requestAnimationFrame(tick)}
 }
-function advanceTv(){const playlist=activePlaylist();if(!playlist.items.length)return;if(tvIndex>=playlist.items.length-1&&!playlist.repeat)return;tvIndex=(tvIndex+1)%playlist.items.length;playTv()}
+function advanceTv(){const playlist=activePlaylist();if(!playlist.items.length)return;const continuous=new URLSearchParams(location.search).has('tv');if(tvIndex>=playlist.items.length-1&&!playlist.repeat&&!continuous)return;tvIndex=(tvIndex+1)%playlist.items.length;playTv()}
 function fullscreenElement(){return document.fullscreenElement||document.webkitFullscreenElement||null}
 async function requestTvWakeLock(){
-  if(tvWakeLock||!('wakeLock'in navigator)||document.visibilityState!=='visible'||$('tvPlayer').hidden)return;
-  try{tvWakeLock=await navigator.wakeLock.request('screen');tvWakeLock.addEventListener('release',()=>{tvWakeLock=null})}catch(error){console.warn('Não foi possível manter a tela ativa.',error)}
+  if(tvWakeLock||tvWakeLockPending||!('wakeLock'in navigator)||document.visibilityState!=='visible'||$('tvPlayer').hidden)return;
+  tvWakeLockPending=true;
+  try{const lock=await navigator.wakeLock.request('screen');if($('tvPlayer').hidden){await lock.release();return}tvWakeLock=lock;lock.addEventListener('release',()=>{if(tvWakeLock===lock)tvWakeLock=null})}catch(error){console.warn('Não foi possível manter a tela ativa.',error)}finally{tvWakeLockPending=false}
 }
+function maintainTvPlayback(){
+  if(!tvReference||$('tvPlayer').hidden||document.visibilityState!=='visible')return;
+  requestTvWakeLock();
+  const video=$('tvVideo');if(video.hidden||!$('tvEmpty').hidden)return;
+  if(video.ended){advanceTv();return}
+  if(video.currentTime!==tvLastVideoTime){tvLastVideoTime=video.currentTime;tvLastVideoProgress=Date.now();return}
+  if(video.paused)video.play().catch(()=>{});
+  if(Date.now()-tvLastVideoProgress>=45000){if(tvVideoRetryCount<2){tvVideoRetryCount++;playTv(true)}else advanceTv()}
+}
+setInterval(maintainTvPlayback,5000);
 async function releaseTvWakeLock(){if(!tvWakeLock)return;const lock=tvWakeLock;tvWakeLock=null;try{await lock.release()}catch{}}
 function updateFullscreenButton(){const active=Boolean(fullscreenElement());const button=$('fullscreenTvButton');button.textContent=active?'⤢ Sair da tela cheia':'⛶ Tela cheia';button.setAttribute('aria-label',active?'Sair da tela cheia':'Ativar tela cheia')}
 async function toggleTvFullscreen(){

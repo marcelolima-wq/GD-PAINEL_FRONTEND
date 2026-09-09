@@ -1,0 +1,16 @@
+const fs=require('node:fs');
+const vm=require('node:vm');
+const assert=require('node:assert/strict');
+const source=fs.readFileSync(require('node:path').join(__dirname,'../js/app.js'),'utf8');
+const advance=source.slice(source.indexOf('function advanceTv(){'),source.indexOf('function fullscreenElement(){'));
+const maintenance=source.slice(source.indexOf('function maintainTvPlayback(){'),source.indexOf('setInterval(maintainTvPlayback'));
+const video={hidden:false,ended:false,currentTime:0,paused:false,play:()=>Promise.resolve()};
+const context={URLSearchParams,location:{search:'?tv=GD2026'},tvIndex:1,activePlaylist:()=>({items:[{},{}],repeat:false}),playTv:()=>{context.plays++},plays:0,tvReference:'GD2026',document:{visibilityState:'visible'},$:id=>id==='tvVideo'?video:{hidden:id==='tvEmpty'},requestTvWakeLock:()=>{},tvLastVideoTime:0,tvLastVideoProgress:0,tvVideoRetryCount:0,Date:{now:()=>50000}};
+vm.createContext(context);vm.runInContext(advance+maintenance,context);
+context.advanceTv();assert.equal(context.tvIndex,0,'TV loops despite old repeat=false');
+context.location.search='';context.tvIndex=1;context.plays=0;context.advanceTv();assert.equal(context.plays,0,'Preview respects repeat setting');
+context.location.search='?tv=GD2026';context.maintainTvPlayback();assert.equal(context.tvVideoRetryCount,1,'Stalled video retries');
+context.tvVideoRetryCount=2;context.maintainTvPlayback();assert.equal(context.tvIndex,0,'Repeated stall advances');
+context.document.visibilityState='hidden';context.plays=0;context.maintainTvPlayback();assert.equal(context.plays,0,'Background does not restart media');
+assert.equal((source.match(/exit\.call\(document\)/g)||[]).length,2,'Only explicit exit handlers exit fullscreen');
+console.log('PASS: continuous loop, preview, stalled-video retry/skip, background guard, explicit fullscreen exits');
