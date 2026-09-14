@@ -86,7 +86,7 @@
       </section>
 
       <section id="libraryView" class="view">
-        <div id="dropZone" class="drop-zone"><div><span class="drop-icon">↑</span><strong>Arraste arquivos para enviar</strong><small>Imagens e vídeos de até 250 MB</small></div><label class="button button-primary">Escolher arquivos<input id="fileInput" type="file" accept="image/*,video/*" multiple hidden></label></div>
+        <div id="dropZone" class="drop-zone"><div><span class="drop-icon">↑</span><strong>Arraste arquivos para enviar</strong><small>Imagens até 10 MB · Vídeos até 100 MB</small></div><label class="button button-primary">Escolher arquivos<input id="fileInput" type="file" accept="image/*,video/*" multiple hidden></label></div>
         <div class="content-toolbar"><div id="libraryFilters" class="segmented"><button class="active" data-filter="all">Tudo <b id="countAll">0</b></button><button data-filter="image">Imagens <b id="countImages">0</b></button><button data-filter="video">Vídeos <b id="countVideos">0</b></button></div><label class="search-field"><span>⌕</span><input id="librarySearch" type="search" placeholder="Buscar na biblioteca"></label></div>
         <div id="libraryGrid" class="media-grid"></div>
         <div id="libraryEmpty" class="empty-state" hidden><span>▧</span><h3>Nenhuma mídia encontrada</h3><p>Envie um arquivo ou altere os filtros de busca.</p></div>
@@ -127,7 +127,7 @@
     </section>
   </div>
   <div id="toast" class="toast" role="status"></div>
-  <script src="js/vendor/vercel-blob-client.js"></script>
+  <script src="js/cloudinary-upload.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

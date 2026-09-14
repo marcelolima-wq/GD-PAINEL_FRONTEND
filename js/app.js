@@ -46,6 +46,7 @@ let tvWakeLock=null;
 let tvWakeLockPending=false;
 let tvLastVideoTime=0;
 let tvLastVideoProgress=0;
+let tvMediaToken=0;
 let uploadInProgress=false;
 
 function loadState(){
@@ -186,13 +187,20 @@ function renderLibrary(){
 document.querySelectorAll('#libraryFilters button').forEach(button=>button.addEventListener('click',()=>{libraryFilter=button.dataset.filter;document.querySelectorAll('#libraryFilters button').forEach(item=>item.classList.toggle('active',item===button));renderLibrary()}));
 $('librarySearch').addEventListener('input',event=>{libraryQuery=event.target.value.trim().toLowerCase();renderLibrary()});
 
+function normalizedMigrationName(value){return String(value||'').trim().toLowerCase().replace(/\s+-\s+copia(?=\.[^.]+$)/i,'')}
+function migrationTarget(file){
+  const type=file.type.startsWith('video/')?'video':'image';
+  const name=normalizedMigrationName(file.name);
+  return state.library.find(media=>media.source==='blob'&&media.type===type&&media.size===file.size&&normalizedMigrationName(media.name)===name);
+}
 async function addFiles(files){
-  const accepted=[...files].filter(file=>(file.type.startsWith('image/')||file.type.startsWith('video/'))&&file.size<=250*1024*1024);
-  if(!accepted.length){showToast('Selecione imagens ou vídeos de até 250 MB.');return}
+  const accepted=[...files];
+  if(!accepted.length)return;
+  if(accepted.some(file=>!(/^(image|video)\//.test(file.type))||file.size<=0||file.size>(file.type.startsWith('video/')?100:10)*1024*1024)){showToast('Use imagens de até 10 MB e vídeos de até 100 MB.');return}
   if(uploadInProgress){showToast('Aguarde o envio atual terminar.');return}
-  uploadInProgress=true;let uploaded=0;
-  try{const upload=window.VercelBlobClient?.upload;if(typeof upload!=='function')throw new Error('Cliente de upload indisponível.');for(const file of accepted){const position=uploaded+1;const blob=await upload(`gd-painel/${Date.now()}-${file.name}`,file,{access:'public',handleUploadUrl:'/api/media/upload',onUploadProgress:progress=>showToast(`Enviando ${position}/${accepted.length} · ${Math.round(progress.percentage||0)}%`)});state.library.unshift({id:uid(),name:file.name,type:file.type.startsWith('video/')?'video':'image',size:file.size,source:'blob',src:blob.url});uploaded++}saveState();clearTimeout(stateSaveTimer);renderAll();const synchronized=await pushState();if(synchronized)showToast(`${uploaded} ${uploaded===1?'arquivo enviado e sincronizado.':'arquivos enviados e sincronizados.'}`)}
-  catch(error){console.error(error);if(uploaded){saveState();clearTimeout(stateSaveTimer);renderAll();await pushState()}showToast(uploaded?'Envio parcial salvo. Tente novamente.':'Falha no envio. Tente novamente.')}
+  uploadInProgress=true;let uploaded=0,migrated=0;
+  try{for(const file of accepted){const position=uploaded+1;const target=migrationTarget(file);showToast(`Enviando ${position}/${accepted.length}…`);const stored=await window.uploadPanelMedia(file,percentage=>showToast(`Enviando ${position}/${accepted.length} · ${Math.round(percentage)}%`));if(target){target.source=stored.source;target.src=stored.url;migrated++}else{state.library.unshift({id:uid(),name:file.name,type:file.type.startsWith('video/')?'video':'image',size:file.size,source:stored.source,src:stored.url})}uploaded++}saveState();clearTimeout(stateSaveTimer);renderAll();const synchronized=await pushState();if(synchronized)showToast(migrated?`${migrated} ${migrated===1?'arquivo antigo migrado':'arquivos antigos migrados'} e sincronizados.`:`${uploaded} ${uploaded===1?'arquivo enviado e sincronizado.':'arquivos enviados e sincronizados.'}`)}
+  catch(error){console.error(error);if(uploaded){saveState();clearTimeout(stateSaveTimer);renderAll();await pushState()}showToast(`${uploaded?'Envio parcial salvo. ':''}${error.message||'Falha no envio. Tente novamente.'}`)}
   finally{uploadInProgress=false}
 }
 $('fileInput').addEventListener('change',event=>{const files=[...event.target.files];event.target.value='';addFiles(files)});
@@ -201,7 +209,7 @@ $('fileInput').addEventListener('change',event=>{const files=[...event.target.fi
 $('dropZone').addEventListener('drop',event=>addFiles(event.dataTransfer.files));
 
 function addMediaToPlaylist(mediaId){const playlist=activePlaylist();playlist.items.push({id:uid(),mediaId,duration:mediaById(mediaId)?.type==='image'?8:0});saveState();renderAll();showToast(`Adicionado à “${playlist.name}”.`)}
-function confirmDeleteMedia(mediaId){const media=mediaById(mediaId);openModal({eyebrow:'EXCLUIR MÍDIA',title:'Remover este arquivo?',description:`“${media.name}” também será removido de todas as playlists.`,confirmText:'Excluir mídia',danger:true,showField:false,onConfirm:async()=>{state.library=state.library.filter(item=>item.id!==mediaId);state.playlists.forEach(playlist=>playlist.items=playlist.items.filter(item=>item.mediaId!==mediaId));if(media.source==='idb')await removeBlob(mediaId);if(media.source==='blob'&&media.src)fetch('/api/media/delete',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:media.src})}).catch(console.error);saveState();renderAll();showToast('Mídia excluída e programação sincronizada.')}})}
+function confirmDeleteMedia(mediaId){const media=mediaById(mediaId);openModal({eyebrow:'EXCLUIR MÍDIA',title:'Remover este arquivo?',description:`“${media.name}” também será removido de todas as playlists.`,confirmText:'Excluir mídia',danger:true,showField:false,onConfirm:async()=>{try{if(['blob','cloudinary'].includes(media.source)&&media.src){const response=await fetch('/api/media/delete',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:media.src})});if(!response.ok)throw new Error('Não foi possível excluir o arquivo do armazenamento.')}if(media.source==='idb')await removeBlob(mediaId);state.library=state.library.filter(item=>item.id!==mediaId);state.playlists.forEach(playlist=>playlist.items=playlist.items.filter(item=>item.mediaId!==mediaId));saveState();clearTimeout(stateSaveTimer);renderAll();if(await pushState())showToast('Mídia excluída e programação sincronizada.')}catch(error){showToast(error.message)}}})}
 
 function renderPlaylists(){
   const current=activePlaylist();
@@ -267,11 +275,11 @@ async function syncTvState(){
 }
 function playTv(isRetry=false){
   tvLastVideoTime=0;tvLastVideoProgress=Date.now();
-  clearTimeout(tvTimer);clearTimeout(tvVideoRetryTimer);cancelAnimationFrame(tvFrame);if(!isRetry)tvVideoRetryCount=0;const playlist=activePlaylist();const item=playlist.items[tvIndex];const image=$('tvImage'),video=$('tvVideo');video.onerror=null;video.onended=null;video.ontimeupdate=null;video.pause();video.removeAttribute('src');video.load();$('tvProgress').style.width='0%';
+  const mediaToken=++tvMediaToken;clearTimeout(tvTimer);clearTimeout(tvVideoRetryTimer);cancelAnimationFrame(tvFrame);if(!isRetry)tvVideoRetryCount=0;const playlist=activePlaylist();const item=playlist.items[tvIndex];const image=$('tvImage'),video=$('tvVideo');video.onerror=null;video.onended=null;video.ontimeupdate=null;video.pause();video.removeAttribute('src');video.load();image.hidden=true;image.style.backgroundImage='';$('tvProgress').style.width='0%';
   if(!item){image.hidden=true;video.hidden=true;$('tvEmpty').hidden=false;$('tvCounter').textContent='';$('tvMediaName').textContent=playlist.name;return}
   const media=mediaById(item.mediaId);if(!media){tvTimer=setTimeout(advanceTv,1000);return}const playback=loadPlayback();savePlayback({playlistId:playlist.id,startedAt:playback?.playlistId===playlist.id&&playback.startedAt?playback.startedAt:Date.now(),currentIndex:tvIndex,itemStartedAt:Date.now()});reportPlayback();$('tvEmpty').hidden=true;$('tvCounter').textContent=`${String(tvIndex+1).padStart(2,'0')} / ${String(playlist.items.length).padStart(2,'0')}`;$('tvMediaName').textContent=media.name;
   if(media.type==='video'){image.hidden=true;video.hidden=false;video.src=media.src;video.muted=true;video.currentTime=0;video.onerror=()=>{video.onerror=null;if(tvVideoRetryCount<2){tvVideoRetryCount++;tvVideoRetryTimer=setTimeout(()=>playTv(true),3000)}else{tvVideoRetryCount=0;advanceTv()}};video.play().catch(()=>{});video.onended=advanceTv;video.ontimeupdate=()=>{if(video.duration)$('tvProgress').style.width=`${video.currentTime/video.duration*100}%`}}
-  else{video.hidden=true;image.hidden=false;image.style.backgroundImage=`url("${media.src}")`;const duration=Math.max(1,Number(item.duration)||8)*1000,start=performance.now();const tick=now=>{const progress=Math.min(1,(now-start)/duration);$('tvProgress').style.width=`${progress*100}%`;if(progress<1)tvFrame=requestAnimationFrame(tick);else advanceTv()};tvFrame=requestAnimationFrame(tick)}
+  else{video.hidden=true;const probe=new Image();probe.onload=()=>{if(mediaToken!==tvMediaToken)return;tvVideoRetryCount=0;image.style.backgroundImage=`url("${media.src}")`;image.hidden=false;const duration=Math.max(1,Number(item.duration)||8)*1000,start=performance.now();const tick=now=>{if(mediaToken!==tvMediaToken)return;const progress=Math.min(1,(now-start)/duration);$('tvProgress').style.width=`${progress*100}%`;if(progress<1)tvFrame=requestAnimationFrame(tick);else advanceTv()};tvFrame=requestAnimationFrame(tick)};probe.onerror=()=>{if(mediaToken!==tvMediaToken)return;if(tvVideoRetryCount<2){tvVideoRetryCount++;tvVideoRetryTimer=setTimeout(()=>playTv(true),3000)}else{tvVideoRetryCount=0;advanceTv()}};probe.src=media.src}
 }
 function advanceTv(){const playlist=activePlaylist();if(!playlist.items.length)return;const continuous=new URLSearchParams(location.search).has('tv');if(tvIndex>=playlist.items.length-1&&!playlist.repeat&&!continuous)return;tvIndex=(tvIndex+1)%playlist.items.length;playTv()}
 function fullscreenElement(){return document.fullscreenElement||document.webkitFullscreenElement||null}
