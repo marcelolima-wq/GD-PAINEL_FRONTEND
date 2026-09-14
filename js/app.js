@@ -239,9 +239,11 @@ async function copyCurrentTvLink(){await copyText(tvLink());showToast(`Link curt
 $('copyTvLinkHero').addEventListener('click',copyCurrentTvLink);$('generateLinkQuick').addEventListener('click',copyCurrentTvLink);$('generateLinkButton').addEventListener('click',copyCurrentTvLink);
 $('openTvButton').addEventListener('click',()=>openTv(activePlaylist().code));
 
-async function fetchTvState(reference){
-  const response=await fetch(`/api/tv?code=${encodeURIComponent(reference)}`,{headers:{Accept:'application/json'},cache:'no-store'});const data=await response.json();if(!response.ok){const error=new Error(data.error||'Programação indisponível.');error.status=response.status;throw error}return data
+async function tvRequest(url,options={},timeoutMs=15000){
+  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),timeoutMs);
+  try{const response=await fetch(url,{...options,signal:controller.signal});const data=await response.json();if(!response.ok){const error=new Error(data.error||'Programação indisponível.');error.status=response.status;throw error}return data}finally{clearTimeout(timer)}
 }
+async function fetchTvState(reference){return tvRequest(`/api/tv?code=${encodeURIComponent(reference)}`,{headers:{Accept:'application/json'},cache:'no-store'})}
 function saveTvCache(reference,data){try{localStorage.setItem(TV_CACHE_KEY,JSON.stringify({code:reference,state:data.state,version:data.version}))}catch(error){console.warn('Cache da TV indisponível.',error)}}
 function loadTvCache(reference){try{const cache=JSON.parse(localStorage.getItem(TV_CACHE_KEY));return cache?.code?.toUpperCase()===String(reference).toUpperCase()?cache:null}catch{return null}}
 function showInvalidTv(message){
@@ -254,7 +256,7 @@ async function openTv(playlistReference){
 }
 async function reportPlayback(){
   clearTimeout(tvHeartbeatTimer);if(!tvReference||$('tvPlayer').hidden)return;
-  try{const local=loadPlayback();await fetch('/api/playback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:tvReference,deviceId:tvDeviceId,fullscreen:Boolean(fullscreenElement()),currentIndex:tvIndex,startedAt:Number(local?.startedAt)||Date.now(),itemStartedAt:Number(local?.itemStartedAt)||Date.now()})})}catch(error){console.warn('Status da TV não atualizado.',error)}
+  try{const local=loadPlayback();await tvRequest('/api/playback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:tvReference,deviceId:tvDeviceId,fullscreen:Boolean(fullscreenElement()),currentIndex:tvIndex,startedAt:Number(local?.startedAt)||Date.now(),itemStartedAt:Number(local?.itemStartedAt)||Date.now()})})}catch(error){console.warn('Status da TV não atualizado.',error)}
   tvHeartbeatTimer=setTimeout(reportPlayback,30000)
 }
 function scheduleTvSync(){clearTimeout(tvSyncTimer);tvSyncTimer=setTimeout(syncTvState,10000)}
