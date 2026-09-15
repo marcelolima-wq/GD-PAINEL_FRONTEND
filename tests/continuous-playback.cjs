@@ -13,4 +13,5 @@ context.location.search='?tv=GD2026';context.maintainTvPlayback();assert.equal(c
 context.tvVideoRetryCount=2;context.maintainTvPlayback();assert.equal(context.tvIndex,0,'Repeated stall advances');
 context.document.visibilityState='hidden';context.plays=0;context.maintainTvPlayback();assert.equal(context.plays,0,'Background does not restart media');
 assert.equal((source.match(/exit\.call\(document\)/g)||[]).length,2,'Only explicit exit handlers exit fullscreen');
+assert.match(source,/media\.source==='blob'\)\{advanceTv\(\);return\}/,'Known blocked legacy media is skipped without pausing the loop');
 console.log('PASS: continuous loop, preview, stalled-video retry/skip, background guard, explicit fullscreen exits');
