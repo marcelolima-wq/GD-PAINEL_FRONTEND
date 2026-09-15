@@ -121,6 +121,7 @@ async function setAuthenticatedView(){
   panelAuthenticated=authenticated;
   if(authenticated){$('accountEmail').textContent=email||'usuario@empresa.com';$('accountAvatar').textContent=(email||'U').charAt(0).toUpperCase();try{await pullState()}catch(error){console.error(error);showToast('Usando cópia local: servidor indisponível.')}renderAll();await refreshServerPlayback()}
 }
+window.setAuthenticatedView=setAuthenticatedView;
 
 $('loginForm').addEventListener('submit',async event=>{
   event.preventDefault();
@@ -131,7 +132,7 @@ $('loginForm').addEventListener('submit',async event=>{
   try{const response=await fetch('/api/auth/login',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({email,password})});const data=await response.json();if(!response.ok)throw new Error(data.error||'Não foi possível entrar.');$('loginPassword').value='';$('loginError').textContent='';await setAuthenticatedView()}catch(error){$('loginError').textContent=error.message;$('loginPassword').select()}finally{submit.disabled=false}
 });
 $('togglePassword').addEventListener('click',()=>{const field=$('loginPassword');field.type=field.type==='password'?'text':'password';$('togglePassword').setAttribute('aria-label',field.type==='password'?'Mostrar senha':'Ocultar senha')});
-$('logoutButton').addEventListener('click',async()=>{try{await fetch('/api/auth/logout',{method:'POST',credentials:'same-origin'})}finally{$('loginPassword').value='';await setAuthenticatedView()}});
+$('logoutButton').addEventListener('click',async()=>{try{await fetch('/api/auth/logout',{method:'POST',credentials:'same-origin'});window.disableGoogleAutoSelect?.()}finally{$('loginPassword').value='';await setAuthenticatedView()}});
 
 const pageCopy={
   panel:['Visão geral','Acompanhe sua programação e mantenha a TV no ar.'],

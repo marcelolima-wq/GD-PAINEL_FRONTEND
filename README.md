@@ -18,6 +18,8 @@ js/app.js
 
 O login depende das rotas `/api/auth/login`, `/api/auth/session` e `/api/auth/logout` fornecidas pelo backend.
 
+O acesso pelo Google usa a biblioteca oficial Google Identity Services. A tela consulta `/api/auth/google/config`, recebe somente o client ID público e troca o ID token em `/api/auth/google/login`; a validação, a restrição ao domínio corporativo e a criação da sessão acontecem no backend.
+
 ## Vercel
 
 Crie outro projeto Vercel usando o mesmo repositório e configure **Root Directory** como `frontend`.

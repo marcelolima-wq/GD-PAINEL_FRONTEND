@@ -1,0 +1,14 @@
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const root=path.join(__dirname,'..');
+const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const script=fs.readFileSync(path.join(root,'js/google-login.js'),'utf8');
+const vercel=fs.readFileSync(path.join(root,'vercel.json'),'utf8');
+assert.match(html,/id="googleLoginSection"[\s\S]*id="googleLoginButton"[\s\S]*>ou</);
+assert.ok(html.indexOf('googleLoginSection')<html.indexOf('loginEmail'),'Google deve aparecer antes do login tradicional');
+assert.match(script,/google\.accounts\.id\.initialize/);
+assert.match(script,/text: 'continue_with'/);
+assert.match(script,/\/api\/auth\/google\/login/);
+assert.doesNotMatch(script,/client_secret/i);
+assert.match(vercel,/script-src[^";]*https:\/\/accounts\.google\.com/);
+assert.match(vercel,/frame-src https:\/\/accounts\.google\.com/);
+console.log('PASS: Google GIS button, ordering, backend exchange and CSP');
